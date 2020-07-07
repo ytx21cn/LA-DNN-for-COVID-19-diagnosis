@@ -13,31 +13,34 @@ from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 from sklearn.preprocessing import MultiLabelBinarizer
 import warnings
+
 warnings.filterwarnings('ignore')
 import torchvision.models as models
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix,roc_auc_score
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score
 import pickle
 from metric import print_f_score
 
 data_transforms = {
     'train': transforms.Compose([
-        transforms.Resize((224,224)),
-        transforms.RandomAffine(0, shear=0.2, scale=(0.8,1.2)),
+        transforms.Resize((224, 224)),
+        transforms.RandomAffine(0, shear=0.2, scale=(0.8, 1.2)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
     'val': transforms.Compose([
-        transforms.Resize((224,224)),
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
 }
 
+
 def Load_Image_Information(path):
     image_Root_Dir = './image_Merge/'
-    iamge_Dir = os.path.join(image_Root_Dir, path)
-    return Image.open(iamge_Dir).convert('RGB')
+    image_Dir = os.path.join(image_Root_Dir, path)
+    return Image.open(image_Dir).convert('RGB')
+
 
 class my_Data_Set(nn.Module):
     def __init__(self, meta_filepath, transform=None, target_transform=None, loader=None):
@@ -71,15 +74,17 @@ class my_Data_Set(nn.Module):
 
 class densenet121_COVID(nn.Module):
     def __init__(self):
-        super(densenet121_COVID,self).__init__()
+        super(densenet121_COVID, self).__init__()
         net = models.densenet121(pretrained=True)
         num_input = net.classifier.in_features
         net.classifier = nn.Linear(num_input, 6)
         self.densenet121_out = net
-    def forward(self,x):
-        x=self.densenet121_out(x)
+
+    def forward(self, x):
+        x = self.densenet121_out(x)
         # print(x.shape)
         return F.sigmoid(x)
+
 
 class loss_fun(nn.Module):
     def __init__(self):
@@ -93,19 +98,22 @@ class loss_fun(nn.Module):
             w1 = torch.prod((target[i][1:] > 0).any()).to(device)
             w2 = (1 - w1).to(device)
             loss[i] = w2 * loss1[i] + w1 * loss2[i]
-        loss[:,0] = 5 * loss[:,0]
-        return torch.mean(loss),torch.mean(loss1)
+        loss[:, 0] = 5 * loss[:, 0]
+        return torch.mean(loss), torch.mean(loss1)
 
-    def __loss_nosym(self, output, target):
+    @staticmethod
+    def __loss_nosym(output, target):
         loss = torch.zeros((target.shape[0], target.shape[1]))
         loss[:, 0] = criterion(output, target)[:, 0]
         return loss
 
-    def __loss_sym(self, output, target):
+    @staticmethod
+    def __loss_sym(output, target):
         loss = criterion(output, target)
         return loss
-def test(model, model_path,test_loader):
 
+
+def test(model, model_path, test_loader):
     checkpoint = torch.load(model_path)
     model.load_state_dict(checkpoint['state_dict'])
     model.eval()
@@ -116,18 +124,19 @@ def test(model, model_path,test_loader):
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
-            #print(output)
-            _,covid_loss=loss_fun(output, target)
-            test_loss += (covid_loss*data.shape[0]).item()
-            pred = output.ge(0.5).float()[:,0]
-            correct += pred.eq(target[:,0].data.view_as(pred)).sum()
+            # print(output)
+            _, covid_loss = loss_fun(output, target)
+            test_loss += (covid_loss * data.shape[0]).item()
+            pred = output.ge(0.5).float()[:, 0]
+            correct += pred.eq(target[:, 0].data.view_as(pred)).sum()
             predicates_all += pred.cpu().numpy().tolist()
-            target_all += target[:,0].data.cpu().numpy().tolist()
+            target_all += target[:, 0].data.cpu().numpy().tolist()
     test_loss /= len(test_loader.dataset)
-    correct=correct.item()
-    test_acc=100. * correct / len(test_loader.dataset)
-    print('\nTest-->  Avg. loss: {:.6f}  acc: {:.3f}% '.format(test_loss,test_acc))
+    correct = correct.item()
+    test_acc = 100. * correct / len(test_loader.dataset)
+    print('\nTest-->  Avg. loss: {:.6f}  acc: {:.3f}% '.format(test_loss, test_acc))
     return predicates_all, target_all
+
 
 if __name__ == '__main__':
     LR = 0.00005
@@ -157,5 +166,5 @@ if __name__ == '__main__':
     print_f_score(predicates_all, target_all)
     print(accuracy_score(target_all, predicates_all))
     print(classification_report(target_all, predicates_all))
-    print("AUC",roc_auc_score(target_all, predicates_all))
+    print("AUC", roc_auc_score(target_all, predicates_all))
     print(confusion_matrix(target_all, predicates_all))
