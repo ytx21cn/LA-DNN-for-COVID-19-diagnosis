@@ -1,23 +1,20 @@
+import os
+import warnings
+
 import numpy as np
 import pandas as pd
-import os
-import shutil
-import matplotlib.pyplot as plt
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torch
-import torchvision
-from torchvision import datasets, transforms
-from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 from sklearn.preprocessing import MultiLabelBinarizer
-import warnings
+from torch.utils.data import DataLoader
+from torchvision import transforms
 
 warnings.filterwarnings('ignore')
 import torchvision.models as models
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score
-import pickle
 from metric import print_f_score
 
 data_transforms = {
